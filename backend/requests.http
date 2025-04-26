@@ -1,0 +1,12 @@
+GET http://localhost:3000/healthz
+
+###
+
+POST http://localhost:3000/query
+Content-Type: application/json
+
+{
+  "query": "What are the names of the users?"   
+}
+
+###
