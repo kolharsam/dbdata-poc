@@ -1,10 +1,10 @@
-import { Button } from "@/components/ui/button";
+import ChatWindow from "@/components/custom/ChatWindow";
 
 function App() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-svh">
-      <Button>Click me</Button>
-    </div>
+    <>
+      <ChatWindow />
+    </>
   );
 }
 
