@@ -1,5 +1,6 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from "./instruction";
+import { MARKDOWN_INSTRUCTIONS } from "./markdown";
 
 const ai = new GoogleGenAI({
   vertexai: true,
@@ -107,7 +108,11 @@ export async function fetchMarkdownResponseFromGenAI(dbData: string) {
               dbData,
           },
           {
-            text: `Based on the the following database results, please provide a concise and efficient markdown response for the following. Please try to tabulate the data in the results provided.`,
+            text: MARKDOWN_INSTRUCTIONS,
+          },
+          {
+            text: `Based on the the following database results, please provide a concise and efficient markdown response for the following. 
+            Please try to tabulate the data in the results provided.`,
           },
         ],
       },

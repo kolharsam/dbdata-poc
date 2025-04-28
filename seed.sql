@@ -81,7 +81,7 @@ INSERT INTO
 VALUES
     (
         1,
-        'Hi, I’m Alice — coffee addict & cat lover.',
+        "Hi, I'm Alice — coffee addict & cat lover.",
         'https://example.com/avatars/alice.png'
     ),
     (
@@ -128,13 +128,13 @@ VALUES
     ),
     (
         1,
-        'Alice’s second post',
+        "Alice's second post",
         'Follow-up from Alice.',
         TRUE
     ),
     (
         4,
-        'Dave’s update',
+        "Dave's update",
         'What Dave has been working on.',
         FALSE
     );

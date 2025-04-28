@@ -26,6 +26,9 @@ export const processQuery =
         console.log(query);
       }
 
+      query = query.replace(/```sql/, "").replace(/```/, "");
+      // remove ```sql and ``` if present
+
       if (!query) {
         res
           .status(400)
