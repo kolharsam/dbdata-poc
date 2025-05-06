@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import { CreditCard, Database, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,9 @@ export default function ChatWindow() {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [selectedTool, setSelectedTool] = useState<"database" | "stripe">(
+    "database"
+  );
 
   const {
     mutate: sendMessageToAgent,
@@ -34,7 +37,10 @@ export default function ChatWindow() {
     mutationFn: async (userQuery: string) => {
       const response = await fetch("http://localhost:3000/query", {
         method: "POST",
-        body: JSON.stringify({ query: userQuery.trim() }),
+        body: JSON.stringify({
+          query: userQuery.trim(),
+          tool: selectedTool,
+        }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -176,18 +182,57 @@ export default function ChatWindow() {
 
       <div className="border-t bg-background p-4">
         <div className="mx-auto max-w-[50%] relative">
+          <div className="flex space-x-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "flex items-center gap-2",
+                selectedTool === "database"
+                  ? "bg-[#336791] text-white border-[#336791] hover:bg-[#2a547a] hover:text-white"
+                  : "text-[#336791] border-[#336791] hover:bg-[#336791] hover:text-white"
+              )}
+              onClick={() => setSelectedTool("database")}
+            >
+              <Database className="h-4 w-4" />
+              <span>Database</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "flex items-center gap-2",
+                selectedTool === "stripe"
+                  ? "bg-[#635BFF] text-white border-[#635BFF] hover:bg-[#4b44cc] hover:text-white"
+                  : "text-[#635BFF] border-[#635BFF] hover:bg-[#635BFF] hover:text-white"
+              )}
+              onClick={() => setSelectedTool("stripe")}
+            >
+              <CreditCard className="h-4 w-4" />
+              <span>Stripe</span>
+            </Button>
+          </div>
           <Textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="What do you want to know from your database?"
+            placeholder={
+              selectedTool === "database"
+                ? "What do you want to know from your database?"
+                : "What do you want to know from your Stripe account?"
+            }
             className="pr-12 resize overflow-y-auto"
             rows={5}
           />
           <Button
             size="icon"
-            className="absolute right-2 bottom-2"
+            className={cn(
+              "absolute right-2 bottom-2",
+              selectedTool === "database"
+                ? "bg-[#336791] hover:bg-[#2a547a]"
+                : "bg-[#635BFF] hover:bg-[#4b44cc]"
+            )}
             onClick={handleSendMessage}
             disabled={!input.trim() || isLoading}
           >
