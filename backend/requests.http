@@ -10,3 +10,26 @@ Content-Type: application/json
 }
 
 ###
+
+GET http://localhost:3000/debug/tool-cards
+
+###
+
+POST http://localhost:3000/debug/test-query
+Content-Type: application/json
+
+{
+  "query": "create a new customer"
+}
+
+###
+
+POST http://localhost:3000/query
+Content-Type: application/json
+
+{
+  "query": "update a new customer with email jenny@example.com to have a new name jenny test test",
+  "tool": "stripe"
+}
+
+###

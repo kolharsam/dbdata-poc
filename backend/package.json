@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,14 +17,20 @@
     "@types/node": "22.15.2",
     "@types/pg": "8.11.14",
     "dotenv": "16.5.0",
+    "nodemon": "3.1.10",
     "ts-node": "10.9.2",
     "typescript": "5.8.3"
   },
   "dependencies": {
+    "@apidevtools/swagger-parser": "10.1.1",
     "@google/genai": "0.10.0",
+    "@pinecone-database/pinecone": "5.1.2",
+    "@readme/openapi-parser": "4.0.0",
     "@types/express": "5.0.1",
+    "cohere-ai": "7.17.1",
     "cors": "2.8.5",
     "express": "5.1.0",
-    "pg": "8.15.6"
+    "pg": "8.15.6",
+    "stripe": "18.1.0"
   }
 }
