@@ -1,6 +1,10 @@
 import fs from "fs";
 import { CohereClient } from "cohere-ai";
-import { Pinecone } from "@pinecone-database/pinecone";
+import {
+  Pinecone,
+  ScoredPineconeRecord,
+  RecordMetadata,
+} from "@pinecone-database/pinecone";
 import { ToolCard } from "./types";
 
 const COHERE_API_KEY = fs.readFileSync(
@@ -143,10 +147,59 @@ export const searchPinecone = async (query: string) => {
   const queryEmbedding = await fetchEmbeddingForUserQuery(query);
 
   const results = await index.query({
-    topK: 5,
+    topK: 10,
     vector: queryEmbedding,
     includeMetadata: true,
   });
 
-  return results;
+  if (!results.matches) {
+    // TODO: Handle this case - no matches found
+    return results;
+  }
+
+  const remappedResults = remapRankingForPineconeResults(results.matches);
+
+  console.log(
+    remappedResults.map((r) => ({
+      path: (r.metadata as any).path,
+      score: r.score,
+      adjustedScore: (r as any).adjustedScore,
+    }))
+  );
+
+  return remappedResults;
+};
+const computeStructuralScore = (path: string): number => {
+  const pathDepth = path.split("/").filter(Boolean).length;
+  const numPathParams = (path.match(/\{[^}]+\}/g) || []).length;
+  const paramPenalty = numPathParams <= 1 ? 1 : 0.5;
+  const depthPenalty = 1 / pathDepth;
+
+  return paramPenalty * depthPenalty * 0.5; // max 0.5
+};
+
+const remapRankingForPineconeResults = (
+  results: ScoredPineconeRecord<RecordMetadata>[],
+  confidenceThreshold: number = 0.66
+) => {
+  if (!results.length) return results;
+
+  return results
+    .map((res, i) => {
+      const path = (res?.metadata?.path as string) || "";
+      const score = res.score ?? 0;
+
+      const protectTop = i === 0 && score >= confidenceThreshold;
+      const structuralScore = computeStructuralScore(path);
+
+      const adjustedScore = protectTop
+        ? score
+        : 0.85 * score + 0.15 * structuralScore;
+
+      return {
+        ...res,
+        adjustedScore,
+      };
+    })
+    .sort((a, b) => (b.adjustedScore ?? 0) - (a.adjustedScore ?? 0));
 };

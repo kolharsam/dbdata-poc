@@ -8,6 +8,13 @@ import {
 } from "../genai";
 import { searchPinecone } from "../integrations";
 import { ToolCard } from "../integrations/types";
+import fs from "fs";
+import path from "path";
+
+const STRIPE_API_KEY = fs.readFileSync(
+  path.join(__dirname, "../integrations/tokens/stripe"),
+  "utf8"
+);
 
 export const processQuery =
   (appContext: AppContext) => async (req: Request, res: Response) => {
@@ -40,7 +47,6 @@ const runDatabaseTool = async (
     let query = "";
     if (genAIQueryResponse?.candidates) {
       query = genAIQueryResponse.candidates[0].content?.parts?.[0]?.text ?? "";
-      console.log(query);
     }
 
     query = query.replace(/```sql/, "").replace(/```/, "");
@@ -61,6 +67,7 @@ const runDatabaseTool = async (
     );
     if (markdownResponse?.candidates) {
       res.json({
+        type: "database",
         response:
           markdownResponse.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
         sqlQuery: query,
@@ -77,14 +84,19 @@ const runDatabaseTool = async (
 const runStripeTool = async (userQuery: string, res: Response) => {
   const pineconeResult = await searchPinecone(userQuery);
 
-  if (!pineconeResult || !pineconeResult.matches.length) {
+  if (
+    !pineconeResult ||
+    (Array.isArray(pineconeResult) && !pineconeResult.length)
+  ) {
     res
       .status(500)
       .json({ error: "failed to fetch relevant tool cards from pinecone" });
     return;
   }
 
-  const selectedTools: ToolCard[] = pineconeResult.matches.map((pr) => ({
+  const selectedTools: ToolCard[] = (
+    Array.isArray(pineconeResult) ? pineconeResult : pineconeResult.matches
+  ).map((pr) => ({
     name: pr.metadata?.name as string,
     description: pr.metadata?.description as string,
     method: pr.metadata?.method as string,
@@ -92,18 +104,88 @@ const runStripeTool = async (userQuery: string, res: Response) => {
     params: JSON.parse(pr.metadata?.params as string),
   }));
 
+  console.log(
+    selectedTools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      method: t.method,
+      path: t.path,
+    }))
+  );
+
   const genAIQueryResponse = await fetchStripeAPICallFromGenAI(
     userQuery,
     selectedTools
   );
 
   if (genAIQueryResponse?.candidates) {
-    res.json({
-      response: cleanseLLMResponse(
-        genAIQueryResponse.candidates[0].content?.parts?.[0]?.text ?? ""
-      ),
-    });
+    const cleanedResponse = cleanseLLMResponse(
+      genAIQueryResponse.candidates[0].content?.parts?.[0]?.text ?? ""
+    ) as GenAIStripeAPICallResponse;
+
+    if (cleanedResponse.status === "complete") {
+      const apiCallResponse = await constructStripeAPICall(cleanedResponse);
+      res.json({
+        response: apiCallResponse,
+        type: "stripe",
+      });
+    } else {
+      res.json({
+        response: cleanedResponse.reason,
+        type: "stripe",
+      });
+    }
   } else {
     res.status(400).json({ error: "no response generated" });
   }
+};
+
+type GenAIStripeAPICallResponse = {
+  status: "incomplete" | "complete";
+  reason?: string;
+  missing?: string[];
+  tool?: string;
+  request?: {
+    method: "GET" | "POST" | "DELETE";
+    url: string;
+    headers: Record<string, string>;
+    queryParams: Record<string, string>;
+    body: Record<string, string>;
+  };
+};
+
+const constructStripeAPICall = async (response: GenAIStripeAPICallResponse) => {
+  if (!response.request) {
+    throw new Error("No request found in response");
+  }
+
+  const { method, url, queryParams, body } = response.request;
+
+  const formBody = new URLSearchParams(body).toString();
+
+  const isBodyMethod = method.toUpperCase() === "POST";
+  const isDeleteWithBody =
+    method.toUpperCase() === "DELETE" && body && Object.keys(body).length > 0;
+
+  const requestOptions: RequestInit = {
+    method,
+    headers: {
+      Authorization: `Bearer ${STRIPE_API_KEY}`,
+      ...(isBodyMethod || isDeleteWithBody
+        ? { "Content-Type": "application/x-www-form-urlencoded" }
+        : {}),
+    },
+    ...(isBodyMethod || isDeleteWithBody
+      ? { body: new URLSearchParams(body).toString() }
+      : {}),
+  };
+
+  const fullUrl =
+    method === "GET" && queryParams
+      ? `${url}?${new URLSearchParams(queryParams).toString()}`
+      : url;
+
+  const res = await fetch(fullUrl, requestOptions);
+
+  return await res.json();
 };
