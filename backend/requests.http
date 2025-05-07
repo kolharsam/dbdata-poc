@@ -6,7 +6,7 @@ POST http://localhost:3000/query
 Content-Type: application/json
 
 {
-  "query": "What are the names of the users?"   
+  "query": "What are the names of the users? limit 4"   
 }
 
 ###
@@ -28,7 +28,7 @@ POST http://localhost:3000/query
 Content-Type: application/json
 
 {
-  "query": "delete a customer with id cus_SGTYVpArCq5t2f",
+  "query": "create a customer",
   "tool": "stripe"
 }
 

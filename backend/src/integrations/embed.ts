@@ -136,8 +136,6 @@ export const embedToolCards = async (toolCards: ToolCard[]) => {
     }));
 
     await cohereIndex.upsert(pineconeVectors);
-
-    console.log(`Upserted ${pineconeVectors.length} tool cards.`);
   }
   console.log("Done storing tool cards in DB");
 };
@@ -159,13 +157,13 @@ export const searchPinecone = async (query: string) => {
 
   const remappedResults = remapRankingForPineconeResults(results.matches);
 
-  console.log(
-    remappedResults.map((r) => ({
-      path: (r.metadata as any).path,
-      score: r.score,
-      adjustedScore: (r as any).adjustedScore,
-    }))
-  );
+  //   console.log(
+  //     remappedResults.map((r) => ({
+  //       path: (r.metadata as any).path,
+  //       score: r.score,
+  //       adjustedScore: (r as any).adjustedScore,
+  //     }))
+  //   );
 
   return remappedResults;
 };

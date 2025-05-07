@@ -10,6 +10,8 @@ import { searchPinecone } from "../integrations";
 import { ToolCard } from "../integrations/types";
 import fs from "fs";
 import path from "path";
+import { SchemaInfo } from "../context/types";
+import { PoolClient } from "pg";
 
 const STRIPE_API_KEY = fs.readFileSync(
   path.join(__dirname, "../integrations/tokens/stripe"),
@@ -25,20 +27,36 @@ export const processQuery =
       return;
     }
 
-    if (tool === "database") {
-      runDatabaseTool(appContext, userQuery, res);
-    } else if (tool === "stripe") {
-      runStripeTool(userQuery, res);
+    switch (tool) {
+      case "database":
+        const dbConn = await appContext.dbPool.connect();
+        const schemaInfo = appContext.schemaInfo;
+        const result = await runDatabaseTool(dbConn, schemaInfo, userQuery);
+
+        if ("error" in result) {
+          res.status(400).json({ error: result.error });
+          return;
+        }
+
+        res.json(result);
+        break;
+      case "stripe":
+        const stripeResult = await runStripeTool(userQuery);
+        res.json(stripeResult);
+        break;
+      default:
+        res.status(400).json({ error: "invalid tool" });
     }
   };
 
 const runDatabaseTool = async (
-  appContext: AppContext,
-  userQuery: string,
-  res: Response
+  dbConn: PoolClient,
+  schemaInfo: SchemaInfo,
+  userQuery: string
 ) => {
   try {
-    const preparedDBInfo = JSON.stringify(appContext.schemaInfo, null, 2);
+    const preparedDBInfo = JSON.stringify(schemaInfo, null, 2);
+
     const genAIQueryResponse = await fetchSQLQueryFromGenAI(
       preparedDBInfo,
       userQuery
@@ -49,49 +67,57 @@ const runDatabaseTool = async (
       query = genAIQueryResponse.candidates[0].content?.parts?.[0]?.text ?? "";
     }
 
+    if (!query) {
+      return {
+        error: "no query generated, error in genAI step",
+      };
+    }
+
     query = query.replace(/```sql/, "").replace(/```/, "");
 
     if (!query) {
-      res
-        .status(400)
-        .json({ error: "no query generated, error in genAI step" });
-      return;
+      return {
+        error: "no query generated, error in genAI step",
+      };
     }
 
-    const db = await appContext.dbPool.connect();
-    const result = await db.query(query);
-    db.release();
+    const result = await dbConn.query(query);
+    dbConn.release();
 
     const markdownResponse = await fetchMarkdownResponseFromGenAI(
       JSON.stringify(result.rows)
     );
+
     if (markdownResponse?.candidates) {
-      res.json({
+      return {
         type: "database",
         response:
           markdownResponse.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
         sqlQuery: query,
-      });
+      };
     } else {
-      res.status(400).json({ error: "no response generated" });
+      return {
+        error: "no response generated",
+      };
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "error executing query" });
+    return {
+      error: "error executing query",
+    };
   }
 };
 
-const runStripeTool = async (userQuery: string, res: Response) => {
+const runStripeTool = async (userQuery: string) => {
   const pineconeResult = await searchPinecone(userQuery);
 
   if (
     !pineconeResult ||
     (Array.isArray(pineconeResult) && !pineconeResult.length)
   ) {
-    res
-      .status(500)
-      .json({ error: "failed to fetch relevant tool cards from pinecone" });
-    return;
+    return {
+      error: "failed to fetch relevant tool cards from pinecone",
+    };
   }
 
   const selectedTools: ToolCard[] = (
@@ -104,14 +130,14 @@ const runStripeTool = async (userQuery: string, res: Response) => {
     params: JSON.parse(pr.metadata?.params as string),
   }));
 
-  console.log(
-    selectedTools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      method: t.method,
-      path: t.path,
-    }))
-  );
+  // console.log(
+  //   selectedTools.map((t) => ({
+  //     name: t.name,
+  //     description: t.description,
+  //     method: t.method,
+  //     path: t.path,
+  //   }))
+  // );
 
   const genAIQueryResponse = await fetchStripeAPICallFromGenAI(
     userQuery,
@@ -125,18 +151,20 @@ const runStripeTool = async (userQuery: string, res: Response) => {
 
     if (cleanedResponse.status === "complete") {
       const apiCallResponse = await constructStripeAPICall(cleanedResponse);
-      res.json({
+      return {
         response: apiCallResponse,
         type: "stripe",
-      });
+      };
     } else {
-      res.json({
+      return {
         response: cleanedResponse.reason,
         type: "stripe",
-      });
+      };
     }
   } else {
-    res.status(400).json({ error: "no response generated" });
+    return {
+      error: "no response generated",
+    };
   }
 };
 
