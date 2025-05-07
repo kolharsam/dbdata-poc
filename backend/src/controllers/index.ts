@@ -8,8 +8,6 @@ import {
 } from "../genai";
 import { searchPinecone } from "../integrations";
 import { ToolCard } from "../integrations/types";
-import fs from "fs";
-import path from "path";
 import { SchemaInfo } from "../context/types";
 import { PoolClient } from "pg";
 
@@ -23,7 +21,7 @@ export const processQuery =
     }
 
     switch (tool) {
-      case "database":
+      case "database": {
         const dbConn = await appContext.dbPool.connect();
         const schemaInfo = appContext.schemaInfo;
         const result = await runDatabaseTool(dbConn, schemaInfo, userQuery);
@@ -34,13 +32,16 @@ export const processQuery =
         }
 
         res.json(result);
-        break;
-      case "stripe":
-        const stripeResult = await runStripeTool(userQuery);
-        res.json(stripeResult);
-        break;
+        return;
+      }
+      case "stripe": {
+        const result = await runStripeTool(userQuery);
+        res.json(result);
+        return;
+      }
       default:
         res.status(400).json({ error: "invalid tool" });
+        return;
     }
   };
 
@@ -183,8 +184,6 @@ const constructStripeAPICall = async (response: GenAIStripeAPICallResponse) => {
   }
 
   const { method, url, queryParams, body } = response.request;
-
-  const formBody = new URLSearchParams(body).toString();
 
   const isBodyMethod = method.toUpperCase() === "POST";
   const isDeleteWithBody =

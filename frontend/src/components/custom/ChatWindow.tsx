@@ -155,11 +155,7 @@ export default function ChatWindow() {
                 >
                   {typeof message.content === "string"
                     ? sanitizeContent(message.content)
-                    : `\`\`\`json\n${JSON.stringify(
-                        message.content,
-                        null,
-                        2
-                      )}\`\`\``}
+                    : `\`\`\`json\n${JSON.stringify(message.content, null, 2)}\`\`\``}
                 </ReactMarkdown>
               </div>
             </div>

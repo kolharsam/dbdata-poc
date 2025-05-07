@@ -5,7 +5,7 @@ const makePool = () => {
     connectionString: process.env.DB_URL,
   });
 
-  pool.on("error", (err: Error, client: PoolClient) => {
+  pool.on("error", (err: Error, _client: PoolClient) => {
     console.error("Unexpected error on idle client", err);
     process.exit(1);
   });

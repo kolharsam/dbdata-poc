@@ -103,7 +103,6 @@ export const extractToolCardsFromSpec = async (): Promise<ToolCard[]> => {
       if (!pathItem) continue;
 
       const methods = ["get", "post", "put", "delete", "patch"] as const;
-      type HttpMethod = (typeof methods)[number];
 
       for (const method of methods) {
         const op = pathItem[method] as OperationObject | undefined;
