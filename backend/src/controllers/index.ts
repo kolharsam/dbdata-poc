@@ -13,11 +13,6 @@ import path from "path";
 import { SchemaInfo } from "../context/types";
 import { PoolClient } from "pg";
 
-const STRIPE_API_KEY = fs.readFileSync(
-  path.join(__dirname, "../integrations/tokens/stripe"),
-  "utf8"
-);
-
 export const processQuery =
   (appContext: AppContext) => async (req: Request, res: Response) => {
     const { query: userQuery, tool = "database" } = req.body;
@@ -198,7 +193,7 @@ const constructStripeAPICall = async (response: GenAIStripeAPICallResponse) => {
   const requestOptions: RequestInit = {
     method,
     headers: {
-      Authorization: `Bearer ${STRIPE_API_KEY}`,
+      Authorization: `Bearer ${process.env.STRIPE_API_TOKEN}`,
       ...(isBodyMethod || isDeleteWithBody
         ? { "Content-Type": "application/x-www-form-urlencoded" }
         : {}),

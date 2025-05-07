@@ -1,27 +1,18 @@
-import fs from "fs";
 import { CohereClient } from "cohere-ai";
 import {
   Pinecone,
   ScoredPineconeRecord,
   RecordMetadata,
 } from "@pinecone-database/pinecone";
+
 import { ToolCard } from "./types";
 
-const COHERE_API_KEY = fs.readFileSync(
-  "src/integrations/tokens/cohere",
-  "utf8"
-);
-const PINECONE_API_KEY = fs.readFileSync(
-  "src/integrations/tokens/pinecone",
-  "utf8"
-);
-
 const cohere = new CohereClient({
-  token: COHERE_API_KEY,
+  token: process.env.COHERE_API_TOKEN,
 });
 
 const pinecone = new Pinecone({
-  apiKey: PINECONE_API_KEY,
+  apiKey: process.env.PINECONE_API_TOKEN as string,
 });
 
 const INDEX_NAME = "dbdata-embeddings";
