@@ -19,7 +19,7 @@ POST http://localhost:3000/debug/test-query
 Content-Type: application/json
 
 {
-  "query": "create a new customer"
+  "query": "update a customer"
 }
 
 ###
@@ -28,7 +28,7 @@ POST http://localhost:3000/query
 Content-Type: application/json
 
 {
-  "query": "update a new customer with email jenny@example.com to have a new name jenny test test",
+  "query": "delete a customer with id cus_SGTYVpArCq5t2f",
   "tool": "stripe"
 }
 
