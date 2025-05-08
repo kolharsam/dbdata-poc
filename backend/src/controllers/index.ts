@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { AppContext } from "../context";
 import {
-  cleanseLLMResponse,
   fetchMarkdownResponseFromGenAI,
   fetchSQLQueryFromGenAI,
   fetchStripeAPICallFromGenAI,
@@ -10,6 +9,9 @@ import { searchPinecone } from "../integrations";
 import { ToolCard } from "../integrations/types";
 import { SchemaInfo } from "../context/types";
 import { PoolClient } from "pg";
+import { cleanseLLMResponse } from "../genai/utils";
+import { Pinecone } from "@pinecone-database/pinecone";
+import { CohereClient } from "cohere-ai";
 
 export const processQuery =
   (appContext: AppContext) => async (req: Request, res: Response) => {
@@ -35,7 +37,11 @@ export const processQuery =
         return;
       }
       case "stripe": {
-        const result = await runStripeTool(userQuery);
+        const result = await runStripeTool(
+          appContext.cohere,
+          appContext.pinecone,
+          userQuery
+        );
         res.json(result);
         return;
       }
@@ -104,8 +110,12 @@ const runDatabaseTool = async (
   }
 };
 
-const runStripeTool = async (userQuery: string) => {
-  const pineconeResult = await searchPinecone(userQuery);
+const runStripeTool = async (
+  cohere: CohereClient,
+  pinecone: Pinecone,
+  userQuery: string
+) => {
+  const pineconeResult = await searchPinecone(pinecone, cohere, userQuery);
 
   if (
     !pineconeResult ||

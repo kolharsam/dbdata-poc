@@ -29,7 +29,11 @@ const port = process.env.PORT || 3000;
 
   app.post("/debug/test-query", async (req: Request, res: Response) => {
     const { query } = req.body;
-    const resultsFromPinecone = await searchPinecone(query);
+    const resultsFromPinecone = await searchPinecone(
+      appContext.pinecone,
+      appContext.cohere,
+      query
+    );
 
     res.status(200).json(resultsFromPinecone);
   });

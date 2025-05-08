@@ -1,24 +1,17 @@
-import { CohereClient } from "cohere-ai";
 import {
-  Pinecone,
   ScoredPineconeRecord,
   RecordMetadata,
+  Pinecone,
+  Index,
 } from "@pinecone-database/pinecone";
 
 import { ToolCard } from "./types";
-
-const cohere = new CohereClient({
-  token: process.env.COHERE_API_TOKEN,
-});
-
-const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_TOKEN as string,
-});
+import { CohereClient } from "cohere-ai";
 
 const INDEX_NAME = "dbdata-embeddings";
 
 // Initialize Pinecone index
-const initPineconeIndex = async () => {
+const initPineconeIndex = async (pinecone: Pinecone) => {
   try {
     const indexList = await pinecone.listIndexes();
 
@@ -45,12 +38,12 @@ const initPineconeIndex = async () => {
   }
 };
 
-let pineconeIndex: ReturnType<typeof pinecone.index>;
+let pineconeIndex: Index<RecordMetadata>;
 
 // Initialize the index before use
-const getPineconeIndex = async () => {
+const getPineconeIndex = async (pinecone: Pinecone) => {
   if (!pineconeIndex) {
-    pineconeIndex = await initPineconeIndex();
+    pineconeIndex = await initPineconeIndex(pinecone);
   }
   return pineconeIndex;
 };
@@ -76,7 +69,10 @@ const formTextFromToolCard = (card: ToolCard): string => {
   return `${card.description}. Method: ${card.method}. Path: ${card.path}. Params: ${paramText}`;
 };
 
-const fetchEmbeddingForUserQuery = async (query: string): Promise<number[]> => {
+const fetchEmbeddingForUserQuery = async (
+  cohere: CohereClient,
+  query: string
+): Promise<number[]> => {
   const embeddingResponse = await cohere.embed({
     texts: [query],
     inputType: "search_query",
@@ -99,8 +95,12 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   );
 }
 
-export const embedToolCards = async (toolCards: ToolCard[]) => {
-  const cohereIndex = await getPineconeIndex();
+export const embedToolCards = async (
+  cohere: CohereClient,
+  pinecone: Pinecone,
+  toolCards: ToolCard[]
+) => {
+  const cohereIndex = await getPineconeIndex(pinecone);
   const batches = chunkArray(toolCards, COHERE_TEXT_LIMIT);
 
   for (const batch of batches) {
@@ -131,9 +131,13 @@ export const embedToolCards = async (toolCards: ToolCard[]) => {
   console.log("Done storing tool cards in DB");
 };
 
-export const searchPinecone = async (query: string) => {
-  const index = await getPineconeIndex();
-  const queryEmbedding = await fetchEmbeddingForUserQuery(query);
+export const searchPinecone = async (
+  pinecone: Pinecone,
+  cohere: CohereClient,
+  query: string
+) => {
+  const index = await getPineconeIndex(pinecone);
+  const queryEmbedding = await fetchEmbeddingForUserQuery(cohere, query);
 
   const results = await index.query({
     topK: 10,
@@ -158,6 +162,7 @@ export const searchPinecone = async (query: string) => {
 
   return remappedResults;
 };
+
 const computeStructuralScore = (path: string): number => {
   const pathDepth = path.split("/").filter(Boolean).length;
   const numPathParams = (path.match(/\{[^}]+\}/g) || []).length;
