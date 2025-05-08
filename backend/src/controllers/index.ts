@@ -12,6 +12,8 @@ import { PoolClient } from "pg";
 import { cleanseLLMResponse } from "../genai/utils";
 import { Pinecone } from "@pinecone-database/pinecone";
 import { CohereClient } from "cohere-ai";
+import { constructStripeAPICall } from "./utils";
+import { GenAIStripeAPICallResponse } from "./utils";
 
 export const processQuery =
   (appContext: AppContext) => async (req: Request, res: Response) => {
@@ -22,10 +24,11 @@ export const processQuery =
       return;
     }
 
+    const { cohere, pinecone, dbPool, schemaInfo } = appContext;
+
     switch (tool) {
       case "database": {
-        const dbConn = await appContext.dbPool.connect();
-        const schemaInfo = appContext.schemaInfo;
+        const dbConn = await dbPool.connect();
         const result = await runDatabaseTool(dbConn, schemaInfo, userQuery);
 
         if ("error" in result) {
@@ -37,11 +40,7 @@ export const processQuery =
         return;
       }
       case "stripe": {
-        const result = await runStripeTool(
-          appContext.cohere,
-          appContext.pinecone,
-          userQuery
-        );
+        const result = await runStripeTool(cohere, pinecone, userQuery);
         res.json(result);
         return;
       }
@@ -90,18 +89,18 @@ const runDatabaseTool = async (
       JSON.stringify(result.rows)
     );
 
-    if (markdownResponse?.candidates) {
-      return {
-        type: "database",
-        response:
-          markdownResponse.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
-        sqlQuery: query,
-      };
-    } else {
+    if (!markdownResponse?.candidates) {
       return {
         error: "no response generated",
       };
     }
+
+    return {
+      type: "database",
+      response:
+        markdownResponse.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
+      sqlQuery: query,
+    };
   } catch (error) {
     console.error(error);
     return {
@@ -150,74 +149,27 @@ const runStripeTool = async (
     selectedTools
   );
 
-  if (genAIQueryResponse?.candidates) {
-    const cleanedResponse = cleanseLLMResponse(
-      genAIQueryResponse.candidates[0].content?.parts?.[0]?.text ?? ""
-    ) as GenAIStripeAPICallResponse;
-
-    if (cleanedResponse.status === "complete") {
-      const apiCallResponse = await constructStripeAPICall(cleanedResponse);
-      return {
-        response: apiCallResponse,
-        type: "stripe",
-      };
-    } else {
-      return {
-        response: cleanedResponse.reason,
-        type: "stripe",
-      };
-    }
-  } else {
+  if (!genAIQueryResponse?.candidates) {
     return {
       error: "no response generated",
     };
   }
-};
 
-type GenAIStripeAPICallResponse = {
-  status: "incomplete" | "complete";
-  reason?: string;
-  missing?: string[];
-  tool?: string;
-  request?: {
-    method: "GET" | "POST" | "DELETE";
-    url: string;
-    headers: Record<string, string>;
-    queryParams: Record<string, string>;
-    body: Record<string, string>;
-  };
-};
+  const cleanedResponse = cleanseLLMResponse(
+    genAIQueryResponse.candidates[0].content?.parts?.[0]?.text ?? ""
+  ) as GenAIStripeAPICallResponse;
 
-const constructStripeAPICall = async (response: GenAIStripeAPICallResponse) => {
-  if (!response.request) {
-    throw new Error("No request found in response");
+  if (cleanedResponse.status !== "incomplete") {
+    return {
+      response: cleanedResponse.reason,
+      type: "stripe",
+    };
   }
 
-  const { method, url, queryParams, body } = response.request;
+  const apiCallResponse = await constructStripeAPICall(cleanedResponse);
 
-  const isBodyMethod = method.toUpperCase() === "POST";
-  const isDeleteWithBody =
-    method.toUpperCase() === "DELETE" && body && Object.keys(body).length > 0;
-
-  const requestOptions: RequestInit = {
-    method,
-    headers: {
-      Authorization: `Bearer ${process.env.STRIPE_API_TOKEN}`,
-      ...(isBodyMethod || isDeleteWithBody
-        ? { "Content-Type": "application/x-www-form-urlencoded" }
-        : {}),
-    },
-    ...(isBodyMethod || isDeleteWithBody
-      ? { body: new URLSearchParams(body).toString() }
-      : {}),
+  return {
+    response: apiCallResponse,
+    type: "stripe",
   };
-
-  const fullUrl =
-    method === "GET" && queryParams
-      ? `${url}?${new URLSearchParams(queryParams).toString()}`
-      : url;
-
-  const res = await fetch(fullUrl, requestOptions);
-
-  return await res.json();
 };
