@@ -160,7 +160,7 @@ const runStripeTool = async (
     genAIQueryResponse.candidates[0].content?.parts?.[0]?.text ?? ""
   ) as GenAIStripeAPICallResponse;
 
-  if (cleanedResponse.status !== "incomplete") {
+  if (cleanedResponse.status === "incomplete") {
     return {
       response: cleanedResponse.reason,
       type: "stripe",
