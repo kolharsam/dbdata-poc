@@ -1,4 +1,8 @@
 import { Request, Response } from "express";
+import { PoolClient } from "pg";
+import { Pinecone } from "@pinecone-database/pinecone";
+import { CohereClient } from "cohere-ai";
+
 import { AppContext } from "../context";
 import {
   fetchMarkdownResponseFromGenAI,
@@ -8,10 +12,7 @@ import {
 import { searchPinecone } from "../integrations";
 import { ToolCard } from "../integrations/types";
 import { SchemaInfo } from "../context/types";
-import { PoolClient } from "pg";
 import { cleanseLLMResponse } from "../genai/utils";
-import { Pinecone } from "@pinecone-database/pinecone";
-import { CohereClient } from "cohere-ai";
 import { constructStripeAPICall } from "./utils";
 import { GenAIStripeAPICallResponse } from "./utils";
 

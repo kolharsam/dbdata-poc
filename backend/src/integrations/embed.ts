@@ -4,9 +4,9 @@ import {
   Pinecone,
   Index,
 } from "@pinecone-database/pinecone";
+import { CohereClient } from "cohere-ai";
 
 import { ToolCard } from "./types";
-import { CohereClient } from "cohere-ai";
 
 const INDEX_NAME = "dbdata-embeddings";
 
@@ -52,13 +52,26 @@ const formTextFromToolCard = (card: ToolCard): string => {
   const paramText = Object.entries(card.params)
     .map(([name, meta]) => {
       const constraintParts = [];
-      if (meta.required) constraintParts.push("required");
-      if (meta.minLength !== undefined)
+
+      if (meta.required) {
+        constraintParts.push("required");
+      }
+
+      if (meta.minLength !== undefined) {
         constraintParts.push(`minLength: ${meta.minLength}`);
-      if (meta.maxLength !== undefined)
+      }
+
+      if (meta.maxLength !== undefined) {
         constraintParts.push(`maxLength: ${meta.maxLength}`);
-      if (meta.enum) constraintParts.push(`enum: [${meta.enum.join(", ")}]`);
-      if (meta.format) constraintParts.push(`format: ${meta.format}`);
+      }
+
+      if (meta.enum) {
+        constraintParts.push(`enum: [${meta.enum.join(", ")}]`);
+      }
+
+      if (meta.format) {
+        constraintParts.push(`format: ${meta.format}`);
+      }
 
       return `${name} (${meta.type}${
         constraintParts.length ? `, ${constraintParts.join(", ")}` : ""
@@ -84,6 +97,7 @@ const fetchEmbeddingForUserQuery = async (
   }
 
   const embeddings = embeddingResponse.embeddings as number[][];
+
   return embeddings[0];
 };
 
@@ -128,6 +142,7 @@ export const embedToolCards = async (
 
     await cohereIndex.upsert(pineconeVectors);
   }
+
   console.log("Done storing tool cards in DB");
 };
 
@@ -150,7 +165,7 @@ export const searchPinecone = async (
     return results;
   }
 
-  const remappedResults = remapRankingForPineconeResults(results.matches);
+  return remapRankingForPineconeResults(results.matches);
 
   //   console.log(
   //     remappedResults.map((r) => ({
@@ -159,8 +174,6 @@ export const searchPinecone = async (
   //       adjustedScore: (r as any).adjustedScore,
   //     }))
   //   );
-
-  return remappedResults;
 };
 
 const computeStructuralScore = (path: string): number => {
@@ -169,7 +182,7 @@ const computeStructuralScore = (path: string): number => {
   const paramPenalty = numPathParams <= 1 ? 1 : 0.5;
   const depthPenalty = 1 / pathDepth;
 
-  return paramPenalty * depthPenalty * 0.5; // max 0.5
+  return paramPenalty * depthPenalty * 0.5;
 };
 
 const remapRankingForPineconeResults = (
